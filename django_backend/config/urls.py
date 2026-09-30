@@ -13,7 +13,16 @@ urlpatterns = [
         "api/auth/",
         include("authentication.urls"),
     ),
-    path("api/cards/", include("cards.urls")),
+
+    path(
+        "api/cards/",
+        include("cards.urls"),
+    ),
+
+    path(
+        "api/transactions/",
+        include("transactions.urls"),
+    ),
 
     path(
         "api/schema/",

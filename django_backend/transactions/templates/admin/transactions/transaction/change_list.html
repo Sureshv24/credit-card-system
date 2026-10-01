@@ -1,0 +1,197 @@
+@'
+{% extends "admin/change_list.html" %}
+
+{% block result_list %}
+
+<div style="
+    margin-bottom: 25px;
+    padding: 20px;
+    background: #ffffff;
+    border: 1px solid #cfcfcf;
+    border-radius: 8px;
+    color: #222222;
+">
+
+    <h2 style="
+        margin: 0;
+        padding: 10px 12px;
+        background: #417690;
+        color: #ffffff;
+        border-radius: 4px;
+        font-size: 16px;
+    ">
+        Daily Payment Summary
+    </h2>
+
+    <p style="
+        margin: 15px 0 20px;
+        color: #444444;
+        font-size: 14px;
+    ">
+        Summary for {{ summary_date }}
+    </p>
+
+    <div style="
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 15px;
+    ">
+
+        <div style="
+            padding: 18px;
+            background: #f7f7f7;
+            border: 1px solid #d5d5d5;
+            border-radius: 6px;
+            color: #222222;
+        ">
+            <div style="
+                font-weight: 600;
+                color: #333333;
+                font-size: 14px;
+            ">
+                Total Transactions
+            </div>
+
+            <div style="
+                font-size: 28px;
+                font-weight: 700;
+                color: #222222;
+                margin-top: 8px;
+            ">
+                {{ daily_summary.total_transactions|default:"0" }}
+            </div>
+        </div>
+
+        <div style="
+            padding: 18px;
+            background: #f7f7f7;
+            border: 1px solid #d5d5d5;
+            border-radius: 6px;
+            color: #222222;
+        ">
+            <div style="
+                font-weight: 600;
+                color: #333333;
+                font-size: 14px;
+            ">
+                Successful
+            </div>
+
+            <div style="
+                font-size: 28px;
+                font-weight: 700;
+                color: #222222;
+                margin-top: 8px;
+            ">
+                {{ daily_summary.successful_transactions|default:"0" }}
+            </div>
+        </div>
+
+        <div style="
+            padding: 18px;
+            background: #f7f7f7;
+            border: 1px solid #d5d5d5;
+            border-radius: 6px;
+            color: #222222;
+        ">
+            <div style="
+                font-weight: 600;
+                color: #333333;
+                font-size: 14px;
+            ">
+                Failed
+            </div>
+
+            <div style="
+                font-size: 28px;
+                font-weight: 700;
+                color: #222222;
+                margin-top: 8px;
+            ">
+                {{ daily_summary.failed_transactions|default:"0" }}
+            </div>
+        </div>
+
+        <div style="
+            padding: 18px;
+            background: #f7f7f7;
+            border: 1px solid #d5d5d5;
+            border-radius: 6px;
+            color: #222222;
+        ">
+            <div style="
+                font-weight: 600;
+                color: #333333;
+                font-size: 14px;
+            ">
+                Pending
+            </div>
+
+            <div style="
+                font-size: 28px;
+                font-weight: 700;
+                color: #222222;
+                margin-top: 8px;
+            ">
+                {{ daily_summary.pending_transactions|default:"0" }}
+            </div>
+        </div>
+
+        <div style="
+            padding: 18px;
+            background: #f7f7f7;
+            border: 1px solid #d5d5d5;
+            border-radius: 6px;
+            color: #222222;
+        ">
+            <div style="
+                font-weight: 600;
+                color: #333333;
+                font-size: 14px;
+            ">
+                Total Amount
+            </div>
+
+            <div style="
+                font-size: 28px;
+                font-weight: 700;
+                color: #222222;
+                margin-top: 8px;
+            ">
+                ₹{{ daily_summary.total_amount|default:"0.00" }}
+            </div>
+        </div>
+
+        <div style="
+            padding: 18px;
+            background: #f7f7f7;
+            border: 1px solid #d5d5d5;
+            border-radius: 6px;
+            color: #222222;
+        ">
+            <div style="
+                font-weight: 600;
+                color: #333333;
+                font-size: 14px;
+            ">
+                Successful Amount
+            </div>
+
+            <div style="
+                font-size: 28px;
+                font-weight: 700;
+                color: #222222;
+                margin-top: 8px;
+            ">
+                ₹{{ daily_summary.successful_amount|default:"0.00" }}
+            </div>
+        </div>
+
+    </div>
+
+</div>
+
+{{ block.super }}
+
+{% endblock %}
+'@ | Set-Content -Encoding UTF8 "transactions\templates\admin\transactions\transaction\change_list.html"

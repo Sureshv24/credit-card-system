@@ -1,0 +1,50 @@
+const API_BASE_URL = "http://127.0.0.1:8000";
+
+export async function apiRequest(endpoint, options = {}) {
+  const token = sessionStorage.getItem("access_token");
+
+  const headers = {
+    "Content-Type": "application/json",
+    ...(options.headers || {}),
+  };
+
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  const response = await fetch(
+    `${API_BASE_URL}${endpoint}`,
+    {
+      ...options,
+      headers,
+    }
+  );
+
+  let data = null;
+
+  try {
+    data = await response.json();
+  } catch {
+    data = null;
+  }
+
+  if (!response.ok) {
+    const error = new Error(
+      data?.detail || "Request failed."
+    );
+
+    error.status = response.status;
+    error.data = data;
+
+    throw error;
+  }
+
+  return data;
+}
+
+export function logoutStorage() {
+  sessionStorage.removeItem("access_token");
+  sessionStorage.removeItem("refresh_token");
+}
+
+export { API_BASE_URL };

@@ -1,5 +1,7 @@
 ﻿import csv
 
+from django.db.models import DateField
+from django.db.models.functions import Cast
 from django.http import HttpResponse
 
 from rest_framework import generics
@@ -10,7 +12,6 @@ from drf_spectacular.utils import (
     extend_schema,
     OpenApiParameter,
     OpenApiTypes,
-    OpenApiResponse,
 )
 
 from .models import Transaction
@@ -79,7 +80,9 @@ class TransactionListView(generics.ListAPIView):
             user_id=self.request.user.id
         )
 
+        # ---------------------------------------------------------
         # Status filter
+        # ---------------------------------------------------------
         status_value = self.request.query_params.get("status")
 
         if status_value:
@@ -87,7 +90,9 @@ class TransactionListView(generics.ListAPIView):
                 status=status_value.upper()
             )
 
+        # ---------------------------------------------------------
         # Minimum amount filter
+        # ---------------------------------------------------------
         min_amount = self.request.query_params.get("min_amount")
 
         if min_amount:
@@ -95,7 +100,9 @@ class TransactionListView(generics.ListAPIView):
                 amount__gte=min_amount
             )
 
+        # ---------------------------------------------------------
         # Maximum amount filter
+        # ---------------------------------------------------------
         max_amount = self.request.query_params.get("max_amount")
 
         if max_amount:
@@ -103,33 +110,42 @@ class TransactionListView(generics.ListAPIView):
                 amount__lte=max_amount
             )
 
+        # ---------------------------------------------------------
+        # Convert created_at to DATE
+        #
+        # This avoids the date filtering issue with the shared
+        # FastAPI payments table and MySQL DateTime field.
+        # ---------------------------------------------------------
+        queryset = queryset.annotate(
+            created_date=Cast(
+                "created_at",
+                output_field=DateField(),
+            )
+        )
+
+        # ---------------------------------------------------------
         # Start date filter
+        # ---------------------------------------------------------
         start_date = self.request.query_params.get("start_date")
 
         if start_date:
             queryset = queryset.filter(
-                created_at__date__gte=start_date
+                created_date__gte=start_date
             )
 
+        # ---------------------------------------------------------
         # End date filter
+        # ---------------------------------------------------------
         end_date = self.request.query_params.get("end_date")
 
         if end_date:
             queryset = queryset.filter(
-                created_at__date__lte=end_date
+                created_date__lte=end_date
             )
 
         return queryset
 
 
-@extend_schema(
-    responses={
-        200: OpenApiResponse(
-            description="CSV file containing all transactions.",
-            response=OpenApiTypes.BINARY,
-        )
-    }
-)
 class TransactionCSVExportView(APIView):
     """
     Export all transactions as a CSV file.

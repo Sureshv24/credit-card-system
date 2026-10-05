@@ -1,4 +1,4 @@
-import csv
+﻿import csv
 
 from django.http import HttpResponse
 
@@ -10,6 +10,7 @@ from drf_spectacular.utils import (
     extend_schema,
     OpenApiParameter,
     OpenApiTypes,
+    OpenApiResponse,
 )
 
 from .models import Transaction
@@ -22,21 +23,30 @@ from .serializers import TransactionSerializer
             name="status",
             type=OpenApiTypes.STR,
             location=OpenApiParameter.QUERY,
-            description="Filter transactions by status: PENDING, SUCCESS, or FAILED.",
+            description=(
+                "Filter transactions by status: "
+                "PENDING, SUCCESS, or FAILED."
+            ),
             required=False,
         ),
         OpenApiParameter(
             name="min_amount",
             type=OpenApiTypes.DECIMAL,
             location=OpenApiParameter.QUERY,
-            description="Filter transactions with amount greater than or equal to this value.",
+            description=(
+                "Filter transactions with amount "
+                "greater than or equal to this value."
+            ),
             required=False,
         ),
         OpenApiParameter(
             name="max_amount",
             type=OpenApiTypes.DECIMAL,
             location=OpenApiParameter.QUERY,
-            description="Filter transactions with amount less than or equal to this value.",
+            description=(
+                "Filter transactions with amount "
+                "less than or equal to this value."
+            ),
             required=False,
         ),
         OpenApiParameter(
@@ -112,16 +122,29 @@ class TransactionListView(generics.ListAPIView):
         return queryset
 
 
+@extend_schema(
+    responses={
+        200: OpenApiResponse(
+            description="CSV file containing all transactions.",
+            response=OpenApiTypes.BINARY,
+        )
+    }
+)
 class TransactionCSVExportView(APIView):
     """
     Export all transactions as a CSV file.
     Only admin/staff users are allowed.
     """
 
-    permission_classes = [IsAuthenticated, IsAdminUser]
+    permission_classes = [
+        IsAuthenticated,
+        IsAdminUser,
+    ]
 
     def get(self, request):
-        transactions = Transaction.objects.all()
+        transactions = Transaction.objects.all().order_by(
+            "-created_at"
+        )
 
         response = HttpResponse(
             content_type="text/csv"
@@ -133,27 +156,31 @@ class TransactionCSVExportView(APIView):
 
         writer = csv.writer(response)
 
-        writer.writerow([
-            "ID",
-            "User ID",
-            "Card ID",
-            "Amount",
-            "Status",
-            "Transaction Reference",
-            "Created At",
-            "Updated At",
-        ])
+        writer.writerow(
+            [
+                "ID",
+                "User ID",
+                "Card ID",
+                "Amount",
+                "Status",
+                "Transaction Reference",
+                "Created At",
+                "Updated At",
+            ]
+        )
 
         for transaction in transactions:
-            writer.writerow([
-                transaction.id,
-                transaction.user_id,
-                transaction.card_id,
-                transaction.amount,
-                transaction.status,
-                transaction.transaction_reference,
-                transaction.created_at,
-                transaction.updated_at,
-            ])
+            writer.writerow(
+                [
+                    transaction.id,
+                    transaction.user_id,
+                    transaction.card_id,
+                    transaction.amount,
+                    transaction.status,
+                    transaction.transaction_reference,
+                    transaction.created_at,
+                    transaction.updated_at,
+                ]
+            )
 
         return response

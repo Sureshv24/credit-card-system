@@ -31,16 +31,15 @@ function Login() {
         }
       );
 
-      sessionStorage.setItem(
-        "access_token",
-        data.access
-      );
+    localStorage.setItem(
+  "access_token",
+  data.access
+);
 
-      sessionStorage.setItem(
-        "refresh_token",
-        data.refresh
-      );
-
+localStorage.setItem(
+  "refresh_token",
+  data.refresh
+);
       navigate("/dashboard", { replace: true });
     } catch (error) {
       setMessage(
@@ -128,7 +127,7 @@ function Login() {
                     <div>
 
                       <p className="font-mono text-base tracking-[0.18em] text-slate-200">
-                        •••• •••• •••• 4821
+                        â€¢â€¢â€¢â€¢ â€¢â€¢â€¢â€¢ â€¢â€¢â€¢â€¢ 4821
                       </p>
 
                       <div className="mt-3 flex items-end justify-between">
@@ -161,7 +160,7 @@ function Login() {
               </div>
 
               <div className="mt-7 text-xs text-slate-600">
-                JWT Protected • Secure Card Handling
+                JWT Protected â€¢ Secure Card Handling
               </div>
 
             </div>

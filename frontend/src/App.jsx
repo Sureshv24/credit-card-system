@@ -1,4 +1,4 @@
-﻿import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes } from "react-router-dom";
 
 import Login from "./pages/Login";
 import Register from "./pages/Register";
@@ -6,9 +6,10 @@ import Dashboard from "./pages/Dashboard";
 import Cards from "./pages/Cards";
 import Payments from "./pages/Payments";
 import Transactions from "./pages/Transactions";
+import AdminDashboard from "./pages/AdminDashboard";
 
 function ProtectedRoute({ children }) {
-  const token = sessionStorage.getItem("access_token");
+  const token = localStorage.getItem("access_token");
 
   if (!token) {
     return <Navigate to="/login" replace />;
@@ -20,11 +21,23 @@ function ProtectedRoute({ children }) {
 function App() {
   return (
     <Routes>
+      {/* ================================================= */}
+      {/* DEFAULT */}
+      {/* ================================================= */}
 
       <Route
         path="/"
-        element={<Navigate to="/login" replace />}
+        element={
+          <Navigate
+            to="/login"
+            replace
+          />
+        }
       />
+
+      {/* ================================================= */}
+      {/* AUTH */}
+      {/* ================================================= */}
 
       <Route
         path="/login"
@@ -36,6 +49,10 @@ function App() {
         element={<Register />}
       />
 
+      {/* ================================================= */}
+      {/* USER DASHBOARD */}
+      {/* ================================================= */}
+
       <Route
         path="/dashboard"
         element={
@@ -44,6 +61,10 @@ function App() {
           </ProtectedRoute>
         }
       />
+
+      {/* ================================================= */}
+      {/* CARDS */}
+      {/* ================================================= */}
 
       <Route
         path="/cards"
@@ -54,6 +75,10 @@ function App() {
         }
       />
 
+      {/* ================================================= */}
+      {/* PAYMENTS */}
+      {/* ================================================= */}
+
       <Route
         path="/payments"
         element={
@@ -62,6 +87,10 @@ function App() {
           </ProtectedRoute>
         }
       />
+
+      {/* ================================================= */}
+      {/* TRANSACTIONS */}
+      {/* ================================================= */}
 
       <Route
         path="/transactions"
@@ -72,11 +101,40 @@ function App() {
         }
       />
 
+      {/* ================================================= */}
+      {/* ADMIN DASHBOARD */}
+      {/* ================================================= */}
+
+      {/*
+        IMPORTANT:
+        AdminDashboard handles its own authentication check.
+
+        We intentionally do NOT wrap this route with
+        ProtectedRoute because that was causing the
+        /admin-dashboard -> /login redirect problem.
+
+        The actual admin APIs are still protected by Django
+        IsAdminUser on the backend.
+      */}
+
       <Route
-        path="*"
-        element={<Navigate to="/login" replace />}
+        path="/admin-dashboard"
+        element={<AdminDashboard />}
       />
 
+      {/* ================================================= */}
+      {/* UNKNOWN ROUTES */}
+      {/* ================================================= */}
+
+      <Route
+        path="*"
+        element={
+          <Navigate
+            to="/login"
+            replace
+          />
+        }
+      />
     </Routes>
   );
 }

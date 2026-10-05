@@ -36,7 +36,7 @@ function Payment() {
         }
       } catch (error) {
         if (error.status === 401) {
-          sessionStorage.clear();
+          localStorage.clear();
           navigate("/login", { replace: true });
           return;
         }
@@ -55,7 +55,7 @@ function Payment() {
   }, [navigate]);
 
   const getAuthHeaders = () => {
-    const token = sessionStorage.getItem("access_token");
+    const token = localStorage.getItem("access_token");
 
     return {
       "Content-Type": "application/json",
@@ -107,7 +107,7 @@ function Payment() {
 
       if (!response.ok) {
         if (response.status === 401) {
-          sessionStorage.clear();
+          localStorage.clear();
           navigate("/login", { replace: true });
           return;
         }
@@ -164,7 +164,7 @@ function Payment() {
 
       if (!response.ok) {
         if (response.status === 401) {
-          sessionStorage.clear();
+          localStorage.clear();
           navigate("/login", { replace: true });
           return;
         }
@@ -404,7 +404,7 @@ function Payment() {
                   <div className="relative">
 
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500">
-                      ₹
+                      â‚¹
                     </span>
 
                     <input
@@ -459,7 +459,7 @@ function Payment() {
                 <div>
 
                   <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-800 text-xl text-cyan-400">
-                    ₹
+                    â‚¹
                   </div>
 
                   <p className="mt-4 font-medium text-slate-300">
@@ -527,7 +527,7 @@ function Payment() {
                     </span>
 
                     <span className="text-sm font-semibold text-slate-200">
-                      ₹{Number(payment.amount).toFixed(2)}
+                      â‚¹{Number(payment.amount).toFixed(2)}
                     </span>
 
                   </div>

@@ -56,6 +56,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    
 
     # Third-party apps
     "rest_framework",
@@ -68,6 +69,8 @@ INSTALLED_APPS = [
     "authentication",
     "cards",
     "transactions",
+    "admin_dashboard",
+    "admin_logs",
 ]
 
 

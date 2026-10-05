@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 import { apiRequest } from "../services/api";
@@ -84,7 +84,7 @@ function Transactions() {
       setCurrentPage(page);
     } catch (error) {
       if (error.status === 401) {
-        sessionStorage.clear();
+        localStorage.clear();
         navigate("/login", { replace: true });
         return;
       }
@@ -106,7 +106,7 @@ function Transactions() {
         await loadTransactions(1);
       } catch (error) {
         if (error.status === 401) {
-          sessionStorage.clear();
+          localStorage.clear();
           navigate("/login", { replace: true });
           return;
         }
@@ -158,7 +158,7 @@ function Transactions() {
       setCurrentPage(1);
     } catch (error) {
       if (error.status === 401) {
-        sessionStorage.clear();
+        localStorage.clear();
         navigate("/login", { replace: true });
         return;
       }

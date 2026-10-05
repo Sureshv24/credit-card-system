@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { apiRequest, logoutStorage } from "../services/api";
@@ -48,8 +48,8 @@ function Dashboard() {
   }, [navigate]);
 
   const handleLogout = async () => {
-    const accessToken = sessionStorage.getItem("access_token");
-    const refreshToken = sessionStorage.getItem("refresh_token");
+    const accessToken = localStorage.getItem("access_token");
+    const refreshToken = localStorage.getItem("refresh_token");
 
     try {
       if (accessToken && refreshToken) {

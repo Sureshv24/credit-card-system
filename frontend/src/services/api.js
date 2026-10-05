@@ -1,7 +1,7 @@
 const API_BASE_URL = "http://127.0.0.1:8000";
 
 export async function apiRequest(endpoint, options = {}) {
-  const token = sessionStorage.getItem("access_token");
+  const token = localStorage.getItem("access_token");
 
   const headers = {
     "Content-Type": "application/json",
@@ -43,8 +43,12 @@ export async function apiRequest(endpoint, options = {}) {
 }
 
 export function logoutStorage() {
-  sessionStorage.removeItem("access_token");
-  sessionStorage.removeItem("refresh_token");
+  localStorage.removeItem("access_token");
+  localStorage.removeItem("refresh_token");
+
+  // Remove old localStorage tokens too
+  localStorage.removeItem("access_token");
+  localStorage.removeItem("refresh_token");
 }
 
 export { API_BASE_URL };

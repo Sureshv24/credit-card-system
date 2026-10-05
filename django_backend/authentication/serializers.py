@@ -1,5 +1,6 @@
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
+from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
 
 User = get_user_model()
@@ -80,5 +81,21 @@ class LogoutSerializer(serializers.Serializer):
         return attrs
 
     def save(self, **kwargs):
-        refresh_token = RefreshToken(self.token)
-        refresh_token.blacklist()
+        try:
+            refresh_token = RefreshToken(self.token)
+            refresh_token.blacklist()
+
+        except TokenError as exc:
+            error_message = str(exc).lower()
+
+            # Logout is idempotent:
+            # if the refresh token is already blacklisted,
+            # the user is already logged out.
+            if "blacklisted" in error_message:
+                return
+
+            raise serializers.ValidationError(
+                {
+                    "refresh": "Invalid or expired refresh token."
+                }
+            )

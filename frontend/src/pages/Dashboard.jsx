@@ -7,38 +7,69 @@ function Dashboard() {
   const navigate = useNavigate();
 
   const [user, setUser] = useState(null);
-  const [cards, setCards] = useState([]);
-  const [transactions, setTransactions] = useState([]);
+
+  const [summary, setSummary] = useState({
+    total_transactions: 0,
+    total_amount_spent: 0,
+    current_month_spending: 0,
+    available_credit_limit: 0,
+    last_5_transactions: [],
+  });
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
     const loadDashboard = async () => {
       try {
-        const [userData, cardData, transactionData] =
-          await Promise.all([
-            apiRequest("/api/auth/me/"),
-            apiRequest("/api/cards/"),
-            apiRequest("/api/transactions/"),
-          ]);
+        setLoading(true);
+        setError("");
+
+        const [userData, summaryData] = await Promise.all([
+          // Django backend
+          apiRequest("/api/auth/me/"),
+
+          // FastAPI dashboard backend
+          apiRequest(
+            "http://127.0.0.1:8001/dashboard/summary"
+          ),
+        ]);
 
         setUser(userData);
-        setCards(cardData?.results || cardData || []);
-        setTransactions(
-          transactionData?.results ||
-            transactionData ||
-            []
-        );
-      } catch (err) {
-        console.error(err);
 
-        if (err.status === 401) {
+        setSummary({
+          total_transactions:
+            summaryData?.total_transactions ?? 0,
+
+          total_amount_spent:
+            summaryData?.total_amount_spent ?? 0,
+
+          current_month_spending:
+            summaryData?.current_month_spending ?? 0,
+
+          available_credit_limit:
+            summaryData?.available_credit_limit ?? 0,
+
+          last_5_transactions:
+            summaryData?.last_5_transactions ?? [],
+        });
+      } catch (err) {
+        console.error("Dashboard loading error:", err);
+
+        if (err?.status === 401) {
+          setError(
+            "Your session has expired. Please login again."
+          );
+
           logoutStorage();
           navigate("/login", { replace: true });
           return;
         }
 
-        setError("Unable to load dashboard data.");
+        setError(
+          err?.message ||
+            "Unable to load dashboard data. Please try again."
+        );
       } finally {
         setLoading(false);
       }
@@ -48,73 +79,167 @@ function Dashboard() {
   }, [navigate]);
 
   const handleLogout = async () => {
-    const accessToken = localStorage.getItem("access_token");
-    const refreshToken = localStorage.getItem("refresh_token");
+    const accessToken =
+      localStorage.getItem("access_token");
+
+    const refreshToken =
+      localStorage.getItem("refresh_token");
 
     try {
       if (accessToken && refreshToken) {
-        await fetch("http://127.0.0.1:8000/api/auth/logout/", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${accessToken}`,
-          },
-          body: JSON.stringify({
-            refresh: refreshToken,
-          }),
-        });
+        await fetch(
+          "http://127.0.0.1:8000/api/auth/logout/",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${accessToken}`,
+            },
+            body: JSON.stringify({
+              refresh: refreshToken,
+            }),
+          }
+        );
       }
     } catch (err) {
-      console.error("Logout request failed:", err);
+      console.error(
+        "Logout request failed:",
+        err
+      );
     }
 
     logoutStorage();
     navigate("/login", { replace: true });
   };
 
-  const successfulCount = transactions.filter(
-    (item) => item.status === "SUCCESS"
-  ).length;
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat("en-IN", {
+      style: "currency",
+      currency: "INR",
+      maximumFractionDigits: 2,
+    }).format(Number(amount || 0));
+  };
 
-  const pendingCount = transactions.filter(
-    (item) => item.status === "PENDING"
-  ).length;
+  const formatDate = (dateValue) => {
+    if (!dateValue) {
+      return "-";
+    }
 
-  const failedCount = transactions.filter(
-    (item) => item.status === "FAILED"
-  ).length;
+    const date = new Date(dateValue);
 
-  const totalAmount = transactions.reduce(
-    (total, item) => total + Number(item.amount || 0),
-    0
-  );
+    if (Number.isNaN(date.getTime())) {
+      return "-";
+    }
+
+    return date.toLocaleDateString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+  };
+
+  const getStatusClass = (status) => {
+    switch (status) {
+      case "SUCCESS":
+        return "bg-emerald-400/10 text-emerald-400";
+
+      case "FAILED":
+        return "bg-red-400/10 text-red-400";
+
+      case "PENDING":
+        return "bg-amber-400/10 text-amber-400";
+
+      default:
+        return "bg-slate-400/10 text-slate-400";
+    }
+  };
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-950 text-white">
-        <div className="text-center">
-          <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-2 border-slate-700 border-t-cyan-400" />
-          <p className="text-sm text-slate-400">
-            Loading your dashboard...
-          </p>
-        </div>
+      <div className="min-h-screen bg-slate-950 text-white">
+        {/* Header Skeleton */}
+        <header className="border-b border-slate-800 bg-slate-900">
+          <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 animate-pulse rounded-xl bg-slate-800" />
+
+              <div>
+                <div className="h-4 w-24 animate-pulse rounded bg-slate-800" />
+
+                <div className="mt-2 h-3 w-32 animate-pulse rounded bg-slate-800" />
+              </div>
+            </div>
+
+            <div className="h-9 w-20 animate-pulse rounded-xl bg-slate-800" />
+          </div>
+        </header>
+
+        <main className="mx-auto max-w-7xl px-6 py-8">
+          {/* Welcome Skeleton */}
+          <section className="mb-8">
+            <div className="h-4 w-28 animate-pulse rounded bg-slate-800" />
+
+            <div className="mt-3 h-8 w-48 animate-pulse rounded bg-slate-800" />
+
+            <div className="mt-3 h-4 w-80 animate-pulse rounded bg-slate-800" />
+          </section>
+
+          {/* Stats Skeleton */}
+          <section className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
+            {[1, 2, 3, 4].map((item) => (
+              <div
+                key={item}
+                className="rounded-2xl border border-slate-800 bg-slate-900 p-5"
+              >
+                <div className="h-4 w-28 animate-pulse rounded bg-slate-800" />
+
+                <div className="mt-4 h-9 w-36 animate-pulse rounded bg-slate-800" />
+
+                <div className="mt-3 h-3 w-24 animate-pulse rounded bg-slate-800" />
+              </div>
+            ))}
+          </section>
+
+          {/* Table Skeleton */}
+          <section className="mt-8">
+            <div className="mb-4 h-6 w-48 animate-pulse rounded bg-slate-800" />
+
+            <div className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900">
+              <div className="space-y-4 p-5">
+                {[1, 2, 3, 4, 5].map((item) => (
+                  <div
+                    key={item}
+                    className="grid grid-cols-4 gap-4"
+                  >
+                    <div className="h-4 animate-pulse rounded bg-slate-800" />
+                    <div className="h-4 animate-pulse rounded bg-slate-800" />
+                    <div className="h-4 animate-pulse rounded bg-slate-800" />
+                    <div className="h-4 animate-pulse rounded bg-slate-800" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+        </main>
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-slate-950 text-white">
-
+      {/* Header */}
       <header className="border-b border-slate-800 bg-slate-900">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-400 font-black text-slate-950">
               C
             </div>
 
             <div>
-              <p className="font-bold">CardPay</p>
+              <p className="font-bold">
+                CardPay
+              </p>
+
               <p className="text-xs text-slate-500">
                 Payment Platform
               </p>
@@ -128,12 +253,12 @@ function Dashboard() {
           >
             Logout
           </button>
-
         </div>
       </header>
 
+      {/* Main */}
       <main className="mx-auto max-w-7xl px-6 py-8">
-
+        {/* Welcome */}
         <section className="mb-8">
           <p className="text-sm font-medium text-cyan-400">
             Welcome back
@@ -144,93 +269,128 @@ function Dashboard() {
           </h1>
 
           <p className="mt-2 text-sm text-slate-500">
-            Manage your cards and payments from one secure place.
+            Here's a quick overview of your credit card usage.
           </p>
         </section>
 
+        {/* Error */}
         {error && (
           <div className="mb-6 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300">
             {error}
           </div>
         )}
 
+        {/* Dashboard Statistics */}
         <section className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
+          {/* Total Spent */}
+          <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5 transition hover:border-cyan-400/30">
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-slate-500">
+                Total Spent
+              </p>
 
-          <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
-            <p className="text-sm text-slate-500">Saved Cards</p>
-            <p className="mt-3 text-3xl font-bold">
-              {cards.length}
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-cyan-400/10 text-cyan-400">
+                ₹
+              </div>
+            </div>
+
+            <p className="mt-4 text-2xl font-bold">
+              {formatCurrency(
+                summary.total_amount_spent
+              )}
+            </p>
+
+            <p className="mt-2 text-xs text-slate-500">
+              Total successful spending
             </p>
           </div>
 
-          <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
-            <p className="text-sm text-slate-500">Transactions</p>
-            <p className="mt-3 text-3xl font-bold">
-              {transactions.length}
+          {/* Available Credit */}
+          <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5 transition hover:border-emerald-400/30">
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-slate-500">
+                Available Credit
+              </p>
+
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-400/10 text-emerald-400">
+                ✓
+              </div>
+            </div>
+
+            <p className="mt-4 text-2xl font-bold text-emerald-400">
+              {formatCurrency(
+                summary.available_credit_limit
+              )}
+            </p>
+
+            <p className="mt-2 text-xs text-slate-500">
+              Remaining credit limit
             </p>
           </div>
 
-          <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
-            <p className="text-sm text-slate-500">Successful</p>
-            <p className="mt-3 text-3xl font-bold text-emerald-400">
-              {successfulCount}
+          {/* Total Transactions */}
+          <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5 transition hover:border-violet-400/30">
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-slate-500">
+                Total Transactions
+              </p>
+
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-violet-400/10 text-violet-400">
+                #
+              </div>
+            </div>
+
+            <p className="mt-4 text-2xl font-bold">
+              {summary.total_transactions}
+            </p>
+
+            <p className="mt-2 text-xs text-slate-500">
+              All transactions
             </p>
           </div>
 
-          <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
-            <p className="text-sm text-slate-500">Total Amount</p>
-            <p className="mt-3 text-3xl font-bold">
-              ₹{totalAmount.toFixed(2)}
+          {/* This Month */}
+          <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5 transition hover:border-amber-400/30">
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-slate-500">
+                This Month
+              </p>
+
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-400/10 text-amber-400">
+                ↗
+              </div>
+            </div>
+
+            <p className="mt-4 text-2xl font-bold text-amber-400">
+              {formatCurrency(
+                summary.current_month_spending
+              )}
+            </p>
+
+            <p className="mt-2 text-xs text-slate-500">
+              Current month spending
             </p>
           </div>
-
         </section>
 
-        <section className="mt-8 grid gap-5 md:grid-cols-3">
-
-          <div className="rounded-2xl border border-amber-400/10 bg-amber-400/5 p-5">
-            <p className="text-sm text-slate-500">
-              Pending Payments
-            </p>
-            <p className="mt-2 text-2xl font-bold text-amber-400">
-              {pendingCount}
-            </p>
-          </div>
-
-          <div className="rounded-2xl border border-emerald-400/10 bg-emerald-400/5 p-5">
-            <p className="text-sm text-slate-500">
-              Successful Payments
-            </p>
-            <p className="mt-2 text-2xl font-bold text-emerald-400">
-              {successfulCount}
-            </p>
-          </div>
-
-          <div className="rounded-2xl border border-red-400/10 bg-red-400/5 p-5">
-            <p className="text-sm text-slate-500">
-              Failed Payments
-            </p>
-            <p className="mt-2 text-2xl font-bold text-red-400">
-              {failedCount}
-            </p>
-          </div>
-
-        </section>
-
+        {/* Quick Actions */}
         <section className="mt-8">
-
           <h2 className="mb-4 text-xl font-semibold">
             Quick Actions
           </h2>
 
           <div className="grid gap-4 md:grid-cols-3">
-
             <button
               type="button"
-              onClick={() => navigate("/cards")}
+              onClick={() =>
+                navigate("/cards")
+              }
               className="rounded-2xl border border-slate-800 bg-slate-900 p-5 text-left transition hover:border-cyan-400/40 hover:bg-slate-800"
             >
-              <p className="font-semibold">Manage Cards</p>
+              <p className="font-semibold">
+                Manage Cards
+              </p>
+
               <p className="mt-2 text-sm text-slate-500">
                 View, add, or remove your saved cards.
               </p>
@@ -238,10 +398,15 @@ function Dashboard() {
 
             <button
               type="button"
-              onClick={() => navigate("/payments")}
+              onClick={() =>
+                navigate("/payments")
+              }
               className="rounded-2xl border border-slate-800 bg-slate-900 p-5 text-left transition hover:border-cyan-400/40 hover:bg-slate-800"
             >
-              <p className="font-semibold">Make Payment</p>
+              <p className="font-semibold">
+                Make Payment
+              </p>
+
               <p className="mt-2 text-sm text-slate-500">
                 Start a secure payment using your card.
               </p>
@@ -249,115 +414,126 @@ function Dashboard() {
 
             <button
               type="button"
-              onClick={() => navigate("/transactions")}
+              onClick={() =>
+                navigate("/transactions")
+              }
               className="rounded-2xl border border-slate-800 bg-slate-900 p-5 text-left transition hover:border-cyan-400/40 hover:bg-slate-800"
             >
               <p className="font-semibold">
                 Transaction History
               </p>
+
               <p className="mt-2 text-sm text-slate-500">
                 View and filter your payment transactions.
               </p>
             </button>
-
           </div>
-
         </section>
 
+        {/* Last 5 Transactions */}
         <section className="mt-8">
-
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-xl font-semibold">
-              Recent Transactions
+              Last 5 Transactions
             </h2>
 
             <span className="text-sm text-slate-500">
-              {transactions.length} total
+              {Math.min(
+                summary.last_5_transactions.length,
+                5
+              )}{" "}
+              shown
             </span>
           </div>
 
           <div className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900">
+            {summary.last_5_transactions.length === 0 ? (
+              <div className="p-10 text-center">
+                <p className="text-sm text-slate-500">
+                  No transactions found.
+                </p>
 
-            {transactions.length === 0 ? (
-              <div className="p-8 text-center text-sm text-slate-500">
-                No transactions found.
+                <button
+                  type="button"
+                  onClick={() =>
+                    navigate("/payments")
+                  }
+                  className="mt-4 rounded-xl bg-cyan-400 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300"
+                >
+                  Make Your First Payment
+                </button>
               </div>
             ) : (
               <div className="overflow-x-auto">
-
                 <table className="w-full min-w-[700px] text-left text-sm">
-
                   <thead className="border-b border-slate-800 text-slate-500">
                     <tr>
-                      <th className="px-5 py-4 font-medium">
-                        Reference
-                      </th>
-
                       <th className="px-5 py-4 font-medium">
                         Amount
                       </th>
 
                       <th className="px-5 py-4 font-medium">
-                        Status
+                        Masked Card
                       </th>
 
                       <th className="px-5 py-4 font-medium">
                         Date
                       </th>
+
+                      <th className="px-5 py-4 font-medium">
+                        Status
+                      </th>
                     </tr>
                   </thead>
 
                   <tbody>
-                    {transactions.slice(0, 5).map(
-                      (transaction) => (
-                        <tr
-                          key={transaction.id}
-                          className="border-b border-slate-800 last:border-0"
-                        >
-                          <td className="px-5 py-4 font-medium text-slate-200">
-                            {transaction.transaction_reference}
-                          </td>
+                    {summary.last_5_transactions
+                      .slice(0, 5)
+                      .map(
+                        (
+                          transaction,
+                          index
+                        ) => (
+                          <tr
+                            key={`${transaction.date}-${index}`}
+                            className="border-b border-slate-800 last:border-0"
+                          >
+                            <td className="px-5 py-4 font-semibold text-slate-200">
+                              {formatCurrency(
+                                transaction.amount
+                              )}
+                            </td>
 
-                          <td className="px-5 py-4">
-                            ₹{Number(
-                              transaction.amount
-                            ).toFixed(2)}
-                          </td>
+                            <td className="px-5 py-4 font-mono text-slate-400">
+                              {transaction.masked_card_number ||
+                                "**** **** **** ****"}
+                            </td>
 
-                          <td className="px-5 py-4">
-                            <span
-                              className={`rounded-full px-3 py-1 text-xs font-medium ${
-                                transaction.status === "SUCCESS"
-                                  ? "bg-emerald-400/10 text-emerald-400"
-                                  : transaction.status === "FAILED"
-                                    ? "bg-red-400/10 text-red-400"
-                                    : "bg-amber-400/10 text-amber-400"
-                              }`}
-                            >
-                              {transaction.status}
-                            </span>
-                          </td>
+                            <td className="px-5 py-4 text-slate-500">
+                              {formatDate(
+                                transaction.date
+                              )}
+                            </td>
 
-                          <td className="px-5 py-4 text-slate-500">
-                            {transaction.created_at
-                              ? new Date(
-                                  transaction.created_at
-                                ).toLocaleDateString()
-                              : "-"}
-                          </td>
-                        </tr>
-                      )
-                    )}
+                            <td className="px-5 py-4">
+                              <span
+                                className={`rounded-full px-3 py-1 text-xs font-medium ${getStatusClass(
+                                  transaction.status
+                                )}`}
+                              >
+                                {transaction.status ||
+                                  "UNKNOWN"}
+                              </span>
+                            </td>
+                          </tr>
+                        )
+                      )}
                   </tbody>
-
                 </table>
-
               </div>
             )}
-
           </div>
         </section>
-
       </main>
     </div>
   );

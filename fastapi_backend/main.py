@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from database import Base, engine
 from models import Payment
 from routers.payments import router as payment_router
-
+from routers.dashboard import router as dashboard_router
 
 # Create database tables if they do not already exist.
 Base.metadata.create_all(bind=engine)
@@ -32,7 +32,8 @@ app.add_middleware(
 
 # Payment routes
 app.include_router(payment_router)
-
+# Dashboard routes
+app.include_router(dashboard_router)
 
 @app.get("/")
 def root():

@@ -12,13 +12,15 @@ export async function apiRequest(endpoint, options = {}) {
     headers.Authorization = `Bearer ${token}`;
   }
 
-  const response = await fetch(
-    `${API_BASE_URL}${endpoint}`,
-    {
-      ...options,
-      headers,
-    }
-  );
+  // Support both relative URLs and full URLs
+  const url = endpoint.startsWith("http")
+    ? endpoint
+    : `${API_BASE_URL}${endpoint}`;
+
+  const response = await fetch(url, {
+    ...options,
+    headers,
+  });
 
   let data = null;
 
@@ -43,10 +45,6 @@ export async function apiRequest(endpoint, options = {}) {
 }
 
 export function logoutStorage() {
-  localStorage.removeItem("access_token");
-  localStorage.removeItem("refresh_token");
-
-  // Remove old localStorage tokens too
   localStorage.removeItem("access_token");
   localStorage.removeItem("refresh_token");
 }

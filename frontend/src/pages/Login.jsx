@@ -1,8 +1,10 @@
-
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
-import { apiRequest } from "../services/api";
+import {
+  API_BASE_URL,
+  apiRequest,
+} from "../services/api";
 
 function Login() {
   const navigate = useNavigate();
@@ -20,6 +22,10 @@ function Login() {
     setLoading(true);
 
     try {
+      // ---------------------------------------------------------
+      // LOGIN
+      // ---------------------------------------------------------
+
       const data = await apiRequest(
         "/api/auth/login/",
         {
@@ -31,16 +37,70 @@ function Login() {
         }
       );
 
-    localStorage.setItem(
-  "access_token",
-  data.access
-);
+      // ---------------------------------------------------------
+      // SAVE JWT TOKENS
+      // ---------------------------------------------------------
 
-localStorage.setItem(
-  "refresh_token",
-  data.refresh
-);
-      navigate("/dashboard", { replace: true });
+      localStorage.setItem(
+        "access_token",
+        data.access
+      );
+
+      localStorage.setItem(
+        "refresh_token",
+        data.refresh
+      );
+
+      // ---------------------------------------------------------
+      // CHECK WHETHER USER IS ADMIN / STAFF
+      // ---------------------------------------------------------
+
+      let isAdmin = false;
+
+      try {
+        const adminResponse = await fetch(
+          `${API_BASE_URL}/api/admin-dashboard/summary/`,
+          {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${data.access}`,
+            },
+          }
+        );
+
+        // Admin / staff user
+        if (adminResponse.status === 200) {
+          isAdmin = true;
+        }
+
+        // Normal user
+        if (adminResponse.status === 403) {
+          isAdmin = false;
+        }
+      } catch (adminError) {
+        console.error(
+          "Admin role check failed:",
+          adminError
+        );
+
+        // Default to normal dashboard
+        isAdmin = false;
+      }
+
+      // ---------------------------------------------------------
+      // ROLE-BASED REDIRECT
+      // ---------------------------------------------------------
+
+      if (isAdmin) {
+        navigate("/admin-dashboard", {
+          replace: true,
+        });
+      } else {
+        navigate("/dashboard", {
+          replace: true,
+        });
+      }
     } catch (error) {
       setMessage(
         error.data?.detail ||
@@ -55,7 +115,10 @@ localStorage.setItem(
     <div className="min-h-screen bg-slate-950 text-white lg:h-screen lg:overflow-hidden">
       <div className="grid min-h-screen lg:h-screen lg:grid-cols-2">
 
+        {/* ================================================= */}
         {/* LEFT */}
+        {/* ================================================= */}
+
         <section className="relative hidden h-full overflow-hidden bg-slate-950 lg:block">
 
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_25%,rgba(34,211,238,0.12),transparent_32%),radial-gradient(circle_at_80%_80%,rgba(59,130,246,0.10),transparent_32%)]" />
@@ -117,17 +180,19 @@ localStorage.setItem(
                   <div className="relative flex h-full flex-col justify-between">
 
                     <div className="flex items-center justify-between">
+
                       <span className="text-xs font-semibold tracking-[0.18em] text-slate-300">
                         CARDPAY
                       </span>
 
                       <div className="h-6 w-9 rounded-md border border-white/10 bg-white/5" />
+
                     </div>
 
                     <div>
 
                       <p className="font-mono text-base tracking-[0.18em] text-slate-200">
-                        â€¢â€¢â€¢â€¢ â€¢â€¢â€¢â€¢ â€¢â€¢â€¢â€¢ 4821
+                        •••• •••• •••• 4821
                       </p>
 
                       <div className="mt-3 flex items-end justify-between">
@@ -153,21 +218,26 @@ localStorage.setItem(
                         </div>
 
                       </div>
+
                     </div>
 
                   </div>
+
                 </div>
               </div>
 
               <div className="mt-7 text-xs text-slate-600">
-                JWT Protected â€¢ Secure Card Handling
+                JWT Protected • Secure Card Handling
               </div>
 
             </div>
           </div>
         </section>
 
+        {/* ================================================= */}
         {/* RIGHT */}
+        {/* ================================================= */}
+
         <section className="flex min-h-screen items-center justify-center bg-slate-950 px-5 py-8 sm:px-8">
 
           <div className="w-full max-w-[420px]">
@@ -229,6 +299,7 @@ localStorage.setItem(
               >
 
                 <div>
+
                   <label className="mb-2 block text-sm font-medium text-slate-300">
                     Username
                   </label>
@@ -244,9 +315,11 @@ localStorage.setItem(
                     required
                     className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3.5 text-sm text-white outline-none placeholder:text-slate-600 focus:border-cyan-400"
                   />
+
                 </div>
 
                 <div>
+
                   <label className="mb-2 block text-sm font-medium text-slate-300">
                     Password
                   </label>
@@ -262,6 +335,7 @@ localStorage.setItem(
                     required
                     className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3.5 text-sm text-white outline-none placeholder:text-slate-600 focus:border-cyan-400"
                   />
+
                 </div>
 
                 <button
@@ -269,7 +343,9 @@ localStorage.setItem(
                   disabled={loading}
                   className="w-full rounded-xl bg-cyan-400 py-3.5 text-sm font-bold text-slate-950 hover:bg-cyan-300 disabled:opacity-60"
                 >
-                  {loading ? "Signing in..." : "Sign In"}
+                  {loading
+                    ? "Signing in..."
+                    : "Sign In"}
                 </button>
 
               </form>

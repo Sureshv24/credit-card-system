@@ -1,4 +1,3 @@
-import random
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -117,9 +116,7 @@ def process_payment(
             detail="Only pending payments can be processed.",
         )
 
-    payment.status = random.choice(
-        ["SUCCESS", "FAILED"]
-    )
+    payment.status = "SUCCESS"
 
     db.commit()
     db.refresh(payment)

@@ -1,10 +1,12 @@
-
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
-import { apiRequest } from "../services/api";
+import {
+  API_BASE_URL,
+  apiRequest,
+} from "../services/api";
 
-const FASTAPI_BASE_URL = "http://127.0.0.1:8001";
+const FASTAPI_BASE_URL = "http://localhost:8001";
 
 function Payment() {
   const navigate = useNavigate();
@@ -22,22 +24,161 @@ function Payment() {
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState("info");
 
+  // ---------------------------------------------------------
+  // Refresh Django access token
+  // ---------------------------------------------------------
+
+  const refreshAccessToken = async () => {
+    const refreshToken =
+      localStorage.getItem("refresh_token");
+
+    if (!refreshToken) {
+      return null;
+    }
+
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/auth/token/refresh/`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            refresh: refreshToken,
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok || !data.access) {
+        return null;
+      }
+
+      localStorage.setItem(
+        "access_token",
+        data.access
+      );
+
+      return data.access;
+    } catch {
+      return null;
+    }
+  };
+
+  // ---------------------------------------------------------
+  // FastAPI authenticated request
+  // ---------------------------------------------------------
+
+  const fastApiRequest = async (
+    endpoint,
+    options = {}
+  ) => {
+    let accessToken =
+      localStorage.getItem("access_token");
+
+    if (!accessToken) {
+      navigate("/login", { replace: true });
+      throw new Error("Authentication required.");
+    }
+
+    const makeRequest = async (token) => {
+      return fetch(
+        `${FASTAPI_BASE_URL}${endpoint}`,
+        {
+          ...options,
+          headers: {
+            "Content-Type": "application/json",
+            ...(options.headers || {}),
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+    };
+
+    let response = await makeRequest(accessToken);
+
+    // Token expired -> refresh and retry once
+    if (response.status === 401) {
+      const newAccessToken =
+        await refreshAccessToken();
+
+      if (!newAccessToken) {
+        localStorage.removeItem("access_token");
+        localStorage.removeItem("refresh_token");
+
+        navigate("/login", {
+          replace: true,
+        });
+
+        throw new Error(
+          "Your session has expired. Please login again."
+        );
+      }
+
+      accessToken = newAccessToken;
+
+      response = await makeRequest(accessToken);
+    }
+
+    let data = null;
+
+    try {
+      data = await response.json();
+    } catch {
+      data = null;
+    }
+
+    if (!response.ok) {
+      const error = new Error(
+        data?.detail ||
+          `Request failed with status ${response.status}.`
+      );
+
+      error.status = response.status;
+      error.data = data;
+
+      throw error;
+    }
+
+    return data;
+  };
+
+  // ---------------------------------------------------------
+  // Load cards
+  // ---------------------------------------------------------
+
   useEffect(() => {
     const loadCards = async () => {
       try {
-        const data = await apiRequest("/api/cards/");
+        const data = await apiRequest(
+          "/api/cards/"
+        );
 
-        const cardList = data?.results || data || [];
+        const cardList =
+          data?.results || data || [];
 
         setCards(cardList);
 
         if (cardList.length > 0) {
-          setSelectedCard(String(cardList[0].id));
+          setSelectedCard(
+            String(cardList[0].id)
+          );
         }
       } catch (error) {
         if (error.status === 401) {
-          localStorage.clear();
-          navigate("/login", { replace: true });
+          localStorage.removeItem(
+            "access_token"
+          );
+          localStorage.removeItem(
+            "refresh_token"
+          );
+
+          navigate("/login", {
+            replace: true,
+          });
+
           return;
         }
 
@@ -54,16 +195,13 @@ function Payment() {
     loadCards();
   }, [navigate]);
 
-  const getAuthHeaders = () => {
-    const token = localStorage.getItem("access_token");
+  // ---------------------------------------------------------
+  // Create payment
+  // ---------------------------------------------------------
 
-    return {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    };
-  };
-
-  const handleCreatePayment = async (event) => {
+  const handleCreatePayment = async (
+    event
+  ) => {
     event.preventDefault();
 
     setMessage("");
@@ -78,49 +216,30 @@ function Payment() {
 
     if (!numericAmount || numericAmount <= 0) {
       setMessageType("error");
-      setMessage("Enter a valid payment amount.");
+      setMessage(
+        "Enter a valid payment amount."
+      );
       return;
     }
 
     setCreatingPayment(true);
 
     try {
-      const response = await fetch(
-        `${FASTAPI_BASE_URL}/api/payments/`,
+      const data = await fastApiRequest(
+        "/api/payments/",
         {
           method: "POST",
-          headers: getAuthHeaders(),
           body: JSON.stringify({
             card_id: Number(selectedCard),
-            amount: Number(numericAmount.toFixed(2)),
+            amount: Number(
+              numericAmount.toFixed(2)
+            ),
           }),
         }
       );
 
-      let data = null;
-
-      try {
-        data = await response.json();
-      } catch {
-        data = null;
-      }
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          localStorage.clear();
-          navigate("/login", { replace: true });
-          return;
-        }
-
-        setMessageType("error");
-        setMessage(
-          data?.detail ||
-            "Unable to create payment."
-        );
-        return;
-      }
-
       setPayment(data);
+
       setMessageType("success");
       setMessage(
         "Payment created successfully and is now pending."
@@ -129,13 +248,20 @@ function Payment() {
       setAmount("");
     } catch (error) {
       setMessageType("error");
+
       setMessage(
-        "Unable to connect to the payment service."
+        error.data?.detail ||
+          error.message ||
+          "Unable to create payment."
       );
     } finally {
       setCreatingPayment(false);
     }
   };
+
+  // ---------------------------------------------------------
+  // Process payment
+  // ---------------------------------------------------------
 
   const handleProcessPayment = async () => {
     if (!payment?.id) {
@@ -146,36 +272,12 @@ function Payment() {
     setProcessingPayment(true);
 
     try {
-      const response = await fetch(
-        `${FASTAPI_BASE_URL}/api/payments/${payment.id}/process`,
+      const data = await fastApiRequest(
+        `/api/payments/${payment.id}/process`,
         {
           method: "POST",
-          headers: getAuthHeaders(),
         }
       );
-
-      let data = null;
-
-      try {
-        data = await response.json();
-      } catch {
-        data = null;
-      }
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          localStorage.clear();
-          navigate("/login", { replace: true });
-          return;
-        }
-
-        setMessageType("error");
-        setMessage(
-          data?.detail ||
-            "Unable to process payment."
-        );
-        return;
-      }
 
       setPayment(data);
 
@@ -192,8 +294,11 @@ function Payment() {
       );
     } catch (error) {
       setMessageType("error");
+
       setMessage(
-        "Unable to connect to the payment service."
+        error.data?.detail ||
+          error.message ||
+          "Unable to process payment."
       );
     } finally {
       setProcessingPayment(false);
@@ -201,7 +306,9 @@ function Payment() {
   };
 
   const selectedCardObject = cards.find(
-    (card) => String(card.id) === String(selectedCard)
+    (card) =>
+      String(card.id) ===
+      String(selectedCard)
   );
 
   return (
@@ -324,21 +431,21 @@ function Payment() {
                   <select
                     value={selectedCard}
                     onChange={(event) =>
-                      setSelectedCard(event.target.value)
+                      setSelectedCard(
+                        event.target.value
+                      )
                     }
                     className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3.5 text-sm text-white outline-none focus:border-cyan-400"
                   >
-
                     {cards.map((card) => (
                       <option
                         key={card.id}
                         value={card.id}
                       >
-                        {card.card_type.toUpperCase()} -{" "}
-                        **** {card.last_four_digits}
+                        {card.card_type.toUpperCase()} - ****{" "}
+                        {card.last_four_digits}
                       </option>
                     ))}
-
                   </select>
 
                 </div>
@@ -404,7 +511,7 @@ function Payment() {
                   <div className="relative">
 
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500">
-                      â‚¹
+                      ₹
                     </span>
 
                     <input
@@ -444,6 +551,7 @@ function Payment() {
           <section className="rounded-2xl border border-slate-800 bg-slate-900 p-6">
 
             <div className="mb-6">
+
               <h2 className="text-xl font-semibold">
                 Payment Status
               </h2>
@@ -451,6 +559,7 @@ function Payment() {
               <p className="mt-2 text-sm text-slate-500">
                 Your current payment processing status.
               </p>
+
             </div>
 
             {!payment ? (
@@ -459,7 +568,7 @@ function Payment() {
                 <div>
 
                   <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-800 text-xl text-cyan-400">
-                    â‚¹
+                    ₹
                   </div>
 
                   <p className="mt-4 font-medium text-slate-300">
@@ -527,7 +636,7 @@ function Payment() {
                     </span>
 
                     <span className="text-sm font-semibold text-slate-200">
-                      â‚¹{Number(payment.amount).toFixed(2)}
+                      ₹{Number(payment.amount).toFixed(2)}
                     </span>
 
                   </div>
@@ -581,7 +690,6 @@ function Payment() {
           </section>
 
         </div>
-
       </main>
     </div>
   );

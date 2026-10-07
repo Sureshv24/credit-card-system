@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 
 import { apiRequest, logoutStorage } from "../services/api";
 
+const CREDIT_LIMIT = 100000;
+
 function Dashboard() {
   const navigate = useNavigate();
 
@@ -12,7 +14,7 @@ function Dashboard() {
     total_transactions: 0,
     total_amount_spent: 0,
     current_month_spending: 0,
-    available_credit_limit: 0,
+    available_credit_limit: CREDIT_LIMIT,
     last_5_transactions: [],
   });
 
@@ -25,36 +27,161 @@ function Dashboard() {
         setLoading(true);
         setError("");
 
-        const [userData, summaryData] = await Promise.all([
-          // Django backend
-          apiRequest("/api/auth/me/"),
+        // ---------------------------------------------------
+        // Load user, transactions and cards
+        // ---------------------------------------------------
 
-          // FastAPI dashboard backend
-          apiRequest(
-            "http://127.0.0.1:8001/dashboard/summary"
-          ),
-        ]);
+        const [userData, transactionsData, cardsData] =
+          await Promise.all([
+            apiRequest("/api/auth/me/"),
+            apiRequest("/api/transactions/"),
+            apiRequest("/api/cards/"),
+          ]);
 
         setUser(userData);
 
+        // ---------------------------------------------------
+        // Normalize API responses
+        // ---------------------------------------------------
+
+        const transactions =
+          transactionsData?.results ||
+          transactionsData ||
+          [];
+
+        const cards =
+          cardsData?.results ||
+          cardsData ||
+          [];
+
+        // ---------------------------------------------------
+        // Card lookup
+        // ---------------------------------------------------
+
+        const cardMap = {};
+
+        cards.forEach((card) => {
+          cardMap[card.id] = card;
+        });
+
+        // ---------------------------------------------------
+        // Sort newest first
+        // ---------------------------------------------------
+
+        const sortedTransactions = [...transactions].sort(
+          (a, b) => {
+            return (
+              new Date(b.created_at || 0) -
+              new Date(a.created_at || 0)
+            );
+          }
+        );
+
+        // ---------------------------------------------------
+        // Total amount
+        // Matches your previous dashboard behaviour:
+        // all transaction amounts are counted.
+        // ---------------------------------------------------
+
+        const totalAmount = sortedTransactions.reduce(
+          (total, transaction) => {
+            return total + Number(transaction.amount || 0);
+          },
+          0
+        );
+
+        // ---------------------------------------------------
+        // Current month spending
+        // ---------------------------------------------------
+
+        const now = new Date();
+
+        const currentMonthSpending =
+          sortedTransactions
+            .filter((transaction) => {
+              if (!transaction.created_at) {
+                return false;
+              }
+
+              const transactionDate = new Date(
+                transaction.created_at
+              );
+
+              return (
+                transactionDate.getMonth() ===
+                  now.getMonth() &&
+                transactionDate.getFullYear() ===
+                  now.getFullYear()
+              );
+            })
+            .reduce((total, transaction) => {
+              return (
+                total +
+                Number(transaction.amount || 0)
+              );
+            }, 0);
+
+        // ---------------------------------------------------
+        // Last 5 transactions
+        // ---------------------------------------------------
+
+        const lastFiveTransactions =
+          sortedTransactions
+            .slice(0, 5)
+            .map((transaction) => {
+              const card =
+                cardMap[transaction.card_id];
+
+              return {
+                id: transaction.id,
+                amount: Number(
+                  transaction.amount || 0
+                ),
+                masked_card_number:
+                  card?.masked_card_number ||
+                  `**** ${transaction.card_id}`,
+                date:
+                  transaction.created_at ||
+                  transaction.updated_at,
+                status: transaction.status,
+                transaction_reference:
+                  transaction.transaction_reference,
+              };
+            });
+
+        // ---------------------------------------------------
+        // Available credit
+        // ---------------------------------------------------
+
+        const availableCredit = Math.max(
+          CREDIT_LIMIT - totalAmount,
+          0
+        );
+
+        // ---------------------------------------------------
+        // Set dashboard summary
+        // ---------------------------------------------------
+
         setSummary({
           total_transactions:
-            summaryData?.total_transactions ?? 0,
+            sortedTransactions.length,
 
-          total_amount_spent:
-            summaryData?.total_amount_spent ?? 0,
+          total_amount_spent: totalAmount,
 
           current_month_spending:
-            summaryData?.current_month_spending ?? 0,
+            currentMonthSpending,
 
           available_credit_limit:
-            summaryData?.available_credit_limit ?? 0,
+            availableCredit,
 
           last_5_transactions:
-            summaryData?.last_5_transactions ?? [],
+            lastFiveTransactions,
         });
       } catch (err) {
-        console.error("Dashboard loading error:", err);
+        console.error(
+          "Dashboard loading error:",
+          err
+        );
 
         if (err?.status === 401) {
           setError(
@@ -62,12 +189,17 @@ function Dashboard() {
           );
 
           logoutStorage();
-          navigate("/login", { replace: true });
+
+          navigate("/login", {
+            replace: true,
+          });
+
           return;
         }
 
         setError(
-          err?.message ||
+          err?.data?.detail ||
+            err?.message ||
             "Unable to load dashboard data. Please try again."
         );
       } finally {
@@ -77,6 +209,10 @@ function Dashboard() {
 
     loadDashboard();
   }, [navigate]);
+
+  // =====================================================
+  // LOGOUT
+  // =====================================================
 
   const handleLogout = async () => {
     const accessToken =
@@ -88,13 +224,18 @@ function Dashboard() {
     try {
       if (accessToken && refreshToken) {
         await fetch(
-          "http://127.0.0.1:8000/api/auth/logout/",
+          "http://localhost:8000/api/auth/logout/",
           {
             method: "POST",
+
             headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${accessToken}`,
+              "Content-Type":
+                "application/json",
+
+              Authorization:
+                `Bearer ${accessToken}`,
             },
+
             body: JSON.stringify({
               refresh: refreshToken,
             }),
@@ -109,8 +250,15 @@ function Dashboard() {
     }
 
     logoutStorage();
-    navigate("/login", { replace: true });
+
+    navigate("/login", {
+      replace: true,
+    });
   };
+
+  // =====================================================
+  // HELPERS
+  // =====================================================
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat("en-IN", {
@@ -154,10 +302,13 @@ function Dashboard() {
     }
   };
 
+  // =====================================================
+  // LOADING
+  // =====================================================
+
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-950 text-white">
-        {/* Header Skeleton */}
         <header className="border-b border-slate-800 bg-slate-900">
           <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
             <div className="flex items-center gap-3">
@@ -175,7 +326,6 @@ function Dashboard() {
         </header>
 
         <main className="mx-auto max-w-7xl px-6 py-8">
-          {/* Welcome Skeleton */}
           <section className="mb-8">
             <div className="h-4 w-28 animate-pulse rounded bg-slate-800" />
 
@@ -184,7 +334,6 @@ function Dashboard() {
             <div className="mt-3 h-4 w-80 animate-pulse rounded bg-slate-800" />
           </section>
 
-          {/* Stats Skeleton */}
           <section className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
             {[1, 2, 3, 4].map((item) => (
               <div
@@ -199,35 +348,19 @@ function Dashboard() {
               </div>
             ))}
           </section>
-
-          {/* Table Skeleton */}
-          <section className="mt-8">
-            <div className="mb-4 h-6 w-48 animate-pulse rounded bg-slate-800" />
-
-            <div className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900">
-              <div className="space-y-4 p-5">
-                {[1, 2, 3, 4, 5].map((item) => (
-                  <div
-                    key={item}
-                    className="grid grid-cols-4 gap-4"
-                  >
-                    <div className="h-4 animate-pulse rounded bg-slate-800" />
-                    <div className="h-4 animate-pulse rounded bg-slate-800" />
-                    <div className="h-4 animate-pulse rounded bg-slate-800" />
-                    <div className="h-4 animate-pulse rounded bg-slate-800" />
-                  </div>
-                ))}
-              </div>
-            </div>
-          </section>
         </main>
       </div>
     );
   }
 
+  // =====================================================
+  // DASHBOARD
+  // =====================================================
+
   return (
     <div className="min-h-screen bg-slate-950 text-white">
-      {/* Header */}
+      {/* HEADER */}
+
       <header className="border-b border-slate-800 bg-slate-900">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
           <div className="flex items-center gap-3">
@@ -256,9 +389,11 @@ function Dashboard() {
         </div>
       </header>
 
-      {/* Main */}
+      {/* MAIN */}
+
       <main className="mx-auto max-w-7xl px-6 py-8">
-        {/* Welcome */}
+        {/* WELCOME */}
+
         <section className="mb-8">
           <p className="text-sm font-medium text-cyan-400">
             Welcome back
@@ -273,16 +408,19 @@ function Dashboard() {
           </p>
         </section>
 
-        {/* Error */}
+        {/* ERROR */}
+
         {error && (
           <div className="mb-6 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300">
             {error}
           </div>
         )}
 
-        {/* Dashboard Statistics */}
+        {/* STATISTICS */}
+
         <section className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
-          {/* Total Spent */}
+          {/* TOTAL SPENT */}
+
           <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5 transition hover:border-cyan-400/30">
             <div className="flex items-center justify-between">
               <p className="text-sm text-slate-500">
@@ -301,11 +439,12 @@ function Dashboard() {
             </p>
 
             <p className="mt-2 text-xs text-slate-500">
-              Total successful spending
+              Total transaction spending
             </p>
           </div>
 
-          {/* Available Credit */}
+          {/* AVAILABLE CREDIT */}
+
           <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5 transition hover:border-emerald-400/30">
             <div className="flex items-center justify-between">
               <p className="text-sm text-slate-500">
@@ -328,7 +467,8 @@ function Dashboard() {
             </p>
           </div>
 
-          {/* Total Transactions */}
+          {/* TOTAL TRANSACTIONS */}
+
           <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5 transition hover:border-violet-400/30">
             <div className="flex items-center justify-between">
               <p className="text-sm text-slate-500">
@@ -349,7 +489,8 @@ function Dashboard() {
             </p>
           </div>
 
-          {/* This Month */}
+          {/* THIS MONTH */}
+
           <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5 transition hover:border-amber-400/30">
             <div className="flex items-center justify-between">
               <p className="text-sm text-slate-500">
@@ -373,7 +514,8 @@ function Dashboard() {
           </div>
         </section>
 
-        {/* Quick Actions */}
+        {/* QUICK ACTIONS */}
+
         <section className="mt-8">
           <h2 className="mb-4 text-xl font-semibold">
             Quick Actions
@@ -430,7 +572,8 @@ function Dashboard() {
           </div>
         </section>
 
-        {/* Last 5 Transactions */}
+        {/* LAST 5 TRANSACTIONS */}
+
         <section className="mt-8">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-xl font-semibold">
@@ -489,45 +632,40 @@ function Dashboard() {
                   <tbody>
                     {summary.last_5_transactions
                       .slice(0, 5)
-                      .map(
-                        (
-                          transaction,
-                          index
-                        ) => (
-                          <tr
-                            key={`${transaction.date}-${index}`}
-                            className="border-b border-slate-800 last:border-0"
-                          >
-                            <td className="px-5 py-4 font-semibold text-slate-200">
-                              {formatCurrency(
-                                transaction.amount
-                              )}
-                            </td>
+                      .map((transaction, index) => (
+                        <tr
+                          key={`${transaction.id}-${index}`}
+                          className="border-b border-slate-800 last:border-0"
+                        >
+                          <td className="px-5 py-4 font-semibold text-slate-200">
+                            {formatCurrency(
+                              transaction.amount
+                            )}
+                          </td>
 
-                            <td className="px-5 py-4 font-mono text-slate-400">
-                              {transaction.masked_card_number ||
-                                "**** **** **** ****"}
-                            </td>
+                          <td className="px-5 py-4 font-mono text-slate-400">
+                            {transaction.masked_card_number ||
+                              "**** **** **** ****"}
+                          </td>
 
-                            <td className="px-5 py-4 text-slate-500">
-                              {formatDate(
-                                transaction.date
-                              )}
-                            </td>
+                          <td className="px-5 py-4 text-slate-500">
+                            {formatDate(
+                              transaction.date
+                            )}
+                          </td>
 
-                            <td className="px-5 py-4">
-                              <span
-                                className={`rounded-full px-3 py-1 text-xs font-medium ${getStatusClass(
-                                  transaction.status
-                                )}`}
-                              >
-                                {transaction.status ||
-                                  "UNKNOWN"}
-                              </span>
-                            </td>
-                          </tr>
-                        )
-                      )}
+                          <td className="px-5 py-4">
+                            <span
+                              className={`rounded-full px-3 py-1 text-xs font-medium ${getStatusClass(
+                                transaction.status
+                              )}`}
+                            >
+                              {transaction.status ||
+                                "UNKNOWN"}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
                   </tbody>
                 </table>
               </div>

@@ -3,22 +3,56 @@ import { Link, useNavigate } from "react-router-dom";
 import { API_BASE_URL, logoutStorage } from "../services/api";
 
 async function adminRequest(endpoint, options = {}) {
-  const token = localStorage.getItem("access_token");
+  let accessToken = localStorage.getItem("access_token");
+  const refreshToken = localStorage.getItem("refresh_token");
 
-  if (!token) {
+  if (!accessToken) {
     const error = new Error("Authentication required.");
     error.status = 401;
     throw error;
   }
 
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...(options.headers || {}),
-      Authorization: `Bearer ${token}`,
-    },
-  });
+  const makeRequest = async (token) => {
+    return fetch(`${API_BASE_URL}${endpoint}`, {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...(options.headers || {}),
+        Authorization: `Bearer ${token}`,
+      },
+    });
+  };
+
+  let response = await makeRequest(accessToken);
+
+  // Access token expired/invalid -> try refresh
+  if (response.status === 401 && refreshToken) {
+    const refreshResponse = await fetch(
+      `${API_BASE_URL}/api/auth/token/refresh/`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          refresh: refreshToken,
+        }),
+      }
+    );
+
+    if (refreshResponse.ok) {
+      const refreshData = await refreshResponse.json();
+
+      accessToken = refreshData.access;
+
+      localStorage.setItem(
+        "access_token",
+        accessToken
+      );
+
+      response = await makeRequest(accessToken);
+    }
+  }
 
   let data = null;
 
@@ -30,7 +64,8 @@ async function adminRequest(endpoint, options = {}) {
 
   if (!response.ok) {
     const error = new Error(
-      data?.detail || `Request failed with status ${response.status}.`
+      data?.detail ||
+        `Request failed with status ${response.status}.`
     );
 
     error.status = response.status;

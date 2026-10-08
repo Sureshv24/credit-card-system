@@ -1,10 +1,12 @@
+from decimal import Decimal
+
 from django.conf import settings
 from django.db import models
 
 
 class Card(models.Model):
     """
-    Stores safe, non-sensitive information about a user's card.
+    Stores only safe, non-sensitive card information.
 
     Full card number and CVV are intentionally NOT stored.
     """
@@ -12,6 +14,11 @@ class Card(models.Model):
     CARD_TYPE_CHOICES = [
         ("credit", "Credit"),
         ("debit", "Debit"),
+    ]
+
+    STATUS_CHOICES = [
+        ("ACTIVE", "Active"),
+        ("BLOCKED", "Blocked"),
     ]
 
     user = models.ForeignKey(
@@ -36,6 +43,18 @@ class Card(models.Model):
     expiry_month = models.PositiveSmallIntegerField()
 
     expiry_year = models.PositiveSmallIntegerField()
+
+    status = models.CharField(
+        max_length=10,
+        choices=STATUS_CHOICES,
+        default="ACTIVE",
+    )
+
+    credit_limit = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal("0.00"),
+    )
 
     created_at = models.DateTimeField(
         auto_now_add=True,

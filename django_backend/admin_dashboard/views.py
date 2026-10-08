@@ -12,10 +12,10 @@ from drf_spectacular.utils import (
 )
 
 from rest_framework import generics
-from admin_logs.permissions import AuditAdminPermission
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from admin_logs.permissions import AuditAdminPermission
 from cards.models import Card
 from transactions.models import Transaction
 
@@ -29,6 +29,10 @@ from .serializers import (
 
 User = get_user_model()
 
+
+# ============================================================
+# ADMIN DASHBOARD SUMMARY
+# ============================================================
 
 class AdminDashboardSummaryView(APIView):
     """
@@ -122,6 +126,10 @@ class AdminDashboardSummaryView(APIView):
         )
 
 
+# ============================================================
+# ADMIN USER LIST
+# ============================================================
+
 class AdminUserListView(generics.ListAPIView):
     """
     Admin-only user list.
@@ -148,14 +156,34 @@ class AdminUserListView(generics.ListAPIView):
             for user in users
         ]
 
-        serializer = self.get_serializer(data, many=True)
+        serializer = self.get_serializer(
+            data,
+            many=True,
+        )
 
         return Response(serializer.data)
 
 
+# ============================================================
+# ADMIN CARD LIST
+# ============================================================
+
 class AdminCardListView(generics.ListAPIView):
     """
     Admin-only card list.
+
+    Returns only safe card information:
+    - ID
+    - User ID
+    - Card type
+    - Masked card number
+    - Last four digits
+    - Expiry
+    - Status
+    - Credit limit
+    - Timestamps
+
+    Full card number and CVV are never returned.
     """
 
     permission_classes = [AuditAdminPermission]
@@ -175,15 +203,25 @@ class AdminCardListView(generics.ListAPIView):
                 "last_four_digits": card.last_four_digits,
                 "expiry_month": card.expiry_month,
                 "expiry_year": card.expiry_year,
+                "status": card.status,
+                "credit_limit": card.credit_limit,
                 "created_at": card.created_at,
+                "updated_at": card.updated_at,
             }
             for card in cards
         ]
 
-        serializer = self.get_serializer(data, many=True)
+        serializer = self.get_serializer(
+            data,
+            many=True,
+        )
 
         return Response(serializer.data)
 
+
+# ============================================================
+# ADMIN TRANSACTION LIST
+# ============================================================
 
 class AdminTransactionListView(generics.ListAPIView):
     """
@@ -205,17 +243,26 @@ class AdminTransactionListView(generics.ListAPIView):
                 "card_id": transaction.card_id,
                 "amount": transaction.amount,
                 "status": transaction.status,
-                "transaction_reference": transaction.transaction_reference,
+                "transaction_reference": (
+                    transaction.transaction_reference
+                ),
                 "created_at": transaction.created_at,
                 "updated_at": transaction.updated_at,
             }
             for transaction in transactions
         ]
 
-        serializer = self.get_serializer(data, many=True)
+        serializer = self.get_serializer(
+            data,
+            many=True,
+        )
 
         return Response(serializer.data)
 
+
+# ============================================================
+# ADMIN TRANSACTION CSV EXPORT
+# ============================================================
 
 class AdminTransactionExportView(APIView):
     """
@@ -227,14 +274,18 @@ class AdminTransactionExportView(APIView):
     @extend_schema(
         responses={
             200: OpenApiResponse(
-                description="CSV file containing all transactions.",
+                description=(
+                    "CSV file containing all transactions."
+                ),
                 response=OpenApiTypes.BINARY,
             )
         }
     )
     def get(self, request):
-        transactions = Transaction.objects.all().order_by(
-            "-created_at"
+        transactions = (
+            Transaction.objects
+            .all()
+            .order_by("-created_at")
         )
 
         response = HttpResponse(
@@ -256,6 +307,7 @@ class AdminTransactionExportView(APIView):
                 "Status",
                 "Transaction Reference",
                 "Created At",
+                "Updated At",
             ]
         )
 
@@ -269,6 +321,7 @@ class AdminTransactionExportView(APIView):
                     transaction.status,
                     transaction.transaction_reference,
                     transaction.created_at,
+                    transaction.updated_at,
                 ]
             )
 

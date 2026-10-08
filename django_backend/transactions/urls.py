@@ -1,6 +1,10 @@
 from django.urls import path
 
-from .views import TransactionCSVExportView, TransactionListView
+from .views import (
+    MonthlyStatementPDFView,
+    TransactionCSVExportView,
+    TransactionListView,
+)
 
 
 urlpatterns = [
@@ -9,9 +13,16 @@ urlpatterns = [
         TransactionListView.as_view(),
         name="transaction-list",
     ),
-     path(
+
+    path(
+        "monthly-statement/",
+        MonthlyStatementPDFView.as_view(),
+        name="monthly-statement",
+    ),
+
+    path(
         "export/",
         TransactionCSVExportView.as_view(),
-        name="transaction-csv-export",
+        name="transaction-export",
     ),
 ]

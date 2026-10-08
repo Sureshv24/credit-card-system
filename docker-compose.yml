@@ -24,6 +24,8 @@ services:
       context: ./django_backend
       dockerfile: Dockerfile
     container_name: credit_card_django
+    env_file:
+      - ./django_backend/.env
     restart: unless-stopped
     depends_on:
       mysql:
@@ -42,6 +44,8 @@ services:
       context: ./fastapi_backend
       dockerfile: Dockerfile
     container_name: credit_card_fastapi
+    env_file:
+      - ./fastapi_backend/.env
     restart: unless-stopped
     depends_on:
       mysql:

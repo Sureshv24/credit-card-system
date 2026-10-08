@@ -2,9 +2,10 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 import {
-  API_BASE_URL,
   apiRequest,
+  logoutStorage,
 } from "../services/api";
+
 
 function Login() {
   const navigate = useNavigate();
@@ -15,21 +16,28 @@ function Login() {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
 
+
   const handleLogin = async (event) => {
     event.preventDefault();
 
     setMessage("");
     setLoading(true);
 
+    /*
+     * Clear any old/stale token before a new login.
+     */
+    logoutStorage();
+
     try {
-      // ---------------------------------------------------------
+      // =========================================================
       // LOGIN
-      // ---------------------------------------------------------
+      // =========================================================
 
       const data = await apiRequest(
         "/api/auth/login/",
         {
           method: "POST",
+          skipAuth: true,
           body: JSON.stringify({
             username: username.trim(),
             password,
@@ -37,9 +45,10 @@ function Login() {
         }
       );
 
-      // ---------------------------------------------------------
+
+      // =========================================================
       // SAVE JWT TOKENS
-      // ---------------------------------------------------------
+      // =========================================================
 
       localStorage.setItem(
         "access_token",
@@ -51,56 +60,65 @@ function Login() {
         data.refresh
       );
 
-      // ---------------------------------------------------------
-      // CHECK WHETHER USER IS ADMIN / STAFF
-      // ---------------------------------------------------------
+
+      // =========================================================
+      // CHECK ADMIN ROLE
+      // =========================================================
 
       let isAdmin = false;
 
       try {
-        const adminResponse = await fetch(
-          `${API_BASE_URL}/api/admin-dashboard/summary/`,
+        await apiRequest(
+          "/api/admin-dashboard/summary/",
           {
             method: "GET",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${data.access}`,
-            },
           }
         );
 
-        // Admin / staff user
-        if (adminResponse.status === 200) {
-          isAdmin = true;
-        }
+        isAdmin = true;
 
-        // Normal user
-        if (adminResponse.status === 403) {
+      } catch (adminError) {
+        if (adminError.status === 403) {
+          isAdmin = false;
+        } else if (adminError.status === 401) {
+          logoutStorage();
+
+          setMessage(
+            "Your login session is invalid. Please login again."
+          );
+
+          return;
+        } else {
+          console.error(
+            "Admin role check failed:",
+            adminError
+          );
+
           isAdmin = false;
         }
-      } catch (adminError) {
-        console.error(
-          "Admin role check failed:",
-          adminError
-        );
-
-        // Default to normal dashboard
-        isAdmin = false;
       }
 
-      // ---------------------------------------------------------
+
+      // =========================================================
       // ROLE-BASED REDIRECT
-      // ---------------------------------------------------------
+      // =========================================================
 
       if (isAdmin) {
-        navigate("/admin-dashboard", {
-          replace: true,
-        });
+        navigate(
+          "/admin-dashboard",
+          {
+            replace: true,
+          }
+        );
       } else {
-        navigate("/dashboard", {
-          replace: true,
-        });
+        navigate(
+          "/dashboard",
+          {
+            replace: true,
+          }
+        );
       }
+
     } catch (error) {
       setMessage(
         error.data?.detail ||
@@ -111,12 +129,14 @@ function Login() {
     }
   };
 
+
   return (
     <div className="min-h-screen bg-slate-950 text-white lg:h-screen lg:overflow-hidden">
+
       <div className="grid min-h-screen lg:h-screen lg:grid-cols-2">
 
         {/* ================================================= */}
-        {/* LEFT */}
+        {/* LEFT SIDE */}
         {/* ================================================= */}
 
         <section className="relative hidden h-full overflow-hidden bg-slate-950 lg:block">
@@ -127,7 +147,11 @@ function Login() {
 
           <div className="absolute bottom-[-100px] right-[-80px] h-72 w-72 rounded-full bg-blue-500/10 blur-3xl" />
 
+
+          {/* Logo */}
+
           <div className="absolute left-10 top-10 z-20">
+
             <div className="flex items-center gap-3">
 
               <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-cyan-400 text-lg font-black text-slate-950">
@@ -135,6 +159,7 @@ function Login() {
               </div>
 
               <div className="text-left">
+
                 <div className="text-xl font-bold">
                   CardPay
                 </div>
@@ -142,38 +167,58 @@ function Login() {
                 <div className="text-xs text-slate-500">
                   Payment Platform
                 </div>
+
               </div>
 
             </div>
+
           </div>
+
+
+          {/* Hero */}
 
           <div className="relative z-10 flex h-full w-full items-center justify-center px-12">
 
             <div className="flex w-full max-w-[650px] flex-col items-center justify-center text-center">
 
               <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-cyan-400/20 bg-cyan-400/10 px-4 py-2 text-xs font-medium text-cyan-300">
+
                 <span className="h-1.5 w-1.5 rounded-full bg-cyan-400" />
+
                 Secure payments
+
               </div>
 
+
               <h1 className="text-4xl font-bold leading-[1.08] tracking-tight xl:text-5xl">
+
                 Your cards.
+
                 <span className="block text-cyan-400">
                   Your payments.
                 </span>
+
                 One secure place.
+
               </h1>
 
+
               <p className="mx-auto mt-5 max-w-lg text-sm leading-6 text-slate-400 xl:text-base">
+
                 Manage your cards, payments, and transactions
                 from one secure platform.
+
               </p>
+
+
+              {/* Card illustration */}
 
               <div className="relative mt-10 h-[190px] w-[380px]">
 
                 <div className="absolute inset-0 rounded-3xl bg-cyan-400/10 blur-2xl" />
 
                 <div className="absolute bottom-0 right-0 h-[130px] w-[255px] rounded-3xl border border-white/5 bg-slate-800/40" />
+
 
                 <div className="absolute left-1/2 top-0 h-[175px] w-[310px] -translate-x-1/2 overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-slate-700 via-slate-800 to-slate-950 p-6 text-left shadow-2xl">
 
@@ -189,15 +234,18 @@ function Login() {
 
                     </div>
 
+
                     <div>
 
                       <p className="font-mono text-base tracking-[0.18em] text-slate-200">
                         •••• •••• •••• 4821
                       </p>
 
+
                       <div className="mt-3 flex items-end justify-between">
 
                         <div>
+
                           <p className="text-[8px] uppercase text-slate-500">
                             Card holder
                           </p>
@@ -205,9 +253,12 @@ function Login() {
                           <p className="mt-1 text-[10px] font-medium">
                             CARDPAY USER
                           </p>
+
                         </div>
 
+
                         <div>
+
                           <p className="text-[8px] uppercase text-slate-500">
                             Valid thru
                           </p>
@@ -215,6 +266,7 @@ function Login() {
                           <p className="mt-1 text-[10px] font-medium">
                             12/30
                           </p>
+
                         </div>
 
                       </div>
@@ -224,23 +276,31 @@ function Login() {
                   </div>
 
                 </div>
+
               </div>
+
 
               <div className="mt-7 text-xs text-slate-600">
                 JWT Protected • Secure Card Handling
               </div>
 
             </div>
+
           </div>
+
         </section>
 
+
         {/* ================================================= */}
-        {/* RIGHT */}
+        {/* RIGHT SIDE */}
         {/* ================================================= */}
 
         <section className="flex min-h-screen items-center justify-center bg-slate-950 px-5 py-8 sm:px-8">
 
           <div className="w-full max-w-[420px]">
+
+
+            {/* Mobile logo */}
 
             <div className="mb-7 flex items-center gap-3 lg:hidden">
 
@@ -249,6 +309,7 @@ function Login() {
               </div>
 
               <div>
+
                 <p className="font-bold">
                   CardPay
                 </p>
@@ -256,11 +317,16 @@ function Login() {
                 <p className="text-xs text-slate-500">
                   Payment Platform
                 </p>
+
               </div>
 
             </div>
 
+
+            {/* Login Card */}
+
             <div className="rounded-3xl border border-slate-800 bg-slate-900 p-7 shadow-2xl sm:p-8">
+
 
               <div className="mb-6">
 
@@ -278,6 +344,9 @@ function Login() {
 
               </div>
 
+
+              {/* Login/Register tabs */}
+
               <div className="mb-6 grid grid-cols-2 rounded-xl bg-slate-950 p-1">
 
                 <div className="rounded-lg bg-cyan-400 py-2.5 text-center text-sm font-semibold text-slate-950">
@@ -293,10 +362,15 @@ function Login() {
 
               </div>
 
+
+              {/* Login form */}
+
               <form
                 onSubmit={handleLogin}
                 className="space-y-4"
               >
+
+                {/* Username */}
 
                 <div>
 
@@ -318,6 +392,9 @@ function Login() {
 
                 </div>
 
+
+                {/* Password */}
+
                 <div>
 
                   <label className="mb-2 block text-sm font-medium text-slate-300">
@@ -338,6 +415,9 @@ function Login() {
 
                 </div>
 
+
+                {/* Submit */}
+
                 <button
                   type="submit"
                   disabled={loading}
@@ -350,23 +430,31 @@ function Login() {
 
               </form>
 
+
+              {/* Error message */}
+
               {message && (
                 <div className="mt-4 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300">
                   {message}
                 </div>
               )}
 
+
               <p className="mt-5 text-center text-xs text-slate-600">
                 Protected authentication powered by Django JWT.
               </p>
 
             </div>
+
           </div>
+
         </section>
 
       </div>
+
     </div>
   );
 }
+
 
 export default Login;

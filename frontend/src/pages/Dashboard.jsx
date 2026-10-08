@@ -1,12 +1,15 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
+
 import { apiRequest, logoutStorage } from "../services/api";
+import { useTheme } from "../context/ThemeContext";
 
 const CREDIT_LIMIT = 100000;
 
 function Dashboard() {
   const navigate = useNavigate();
+  const { theme, toggleTheme } = useTheme();
 
   const [user, setUser] = useState(null);
 
@@ -379,13 +382,26 @@ function Dashboard() {
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={handleLogout}
-            className="rounded-xl border border-slate-700 px-4 py-2 text-sm font-medium text-slate-300 transition hover:bg-slate-800 hover:text-white"
-          >
-            Logout
-          </button>
+          <div className="flex items-center gap-3">
+  <button
+    type="button"
+    onClick={toggleTheme}
+    aria-label={`Switch to ${
+      theme === "dark" ? "light" : "dark"
+    } mode`}
+    className="rounded-xl border border-slate-700 px-4 py-2 text-sm font-medium text-slate-300 transition hover:bg-slate-800 hover:text-white"
+  >
+    {theme === "dark" ? "☀️ Light" : "🌙 Dark"}
+  </button>
+
+  <button
+    type="button"
+    onClick={handleLogout}
+    className="rounded-xl border border-slate-700 px-4 py-2 text-sm font-medium text-slate-300 transition hover:bg-slate-800 hover:text-white"
+  >
+    Logout
+  </button>
+</div>
         </div>
       </header>
 

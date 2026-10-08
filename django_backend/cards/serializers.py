@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from rest_framework import serializers
 
 from .models import Card
@@ -20,13 +22,17 @@ class CardSerializer(serializers.ModelSerializer):
             "last_four_digits",
             "expiry_month",
             "expiry_year",
+            "status",
+            "credit_limit",
             "created_at",
             "updated_at",
         ]
+
         read_only_fields = [
             "id",
             "masked_card_number",
             "last_four_digits",
+            "status",
             "created_at",
             "updated_at",
         ]
@@ -52,10 +58,20 @@ class CardSerializer(serializers.ModelSerializer):
 
         return value
 
+    def validate_credit_limit(self, value):
+        if value < Decimal("0.00"):
+            raise serializers.ValidationError(
+                "Credit limit cannot be negative."
+            )
+
+        return value
+
     def create(self, validated_data):
         card_number = validated_data.pop("card_number")
 
         validated_data["last_four_digits"] = card_number[-4:]
-        validated_data["masked_card_number"] = "*" * (len(card_number) - 4) + card_number[-4:]
+        validated_data["masked_card_number"] = (
+            "*" * (len(card_number) - 4) + card_number[-4:]
+        )
 
         return Card.objects.create(**validated_data)

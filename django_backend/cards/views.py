@@ -6,11 +6,6 @@ from .serializers import CardSerializer
 
 
 class CardListCreateView(generics.ListCreateAPIView):
-    """
-    List the logged-in user's cards
-    and allow the user to add a new card.
-    """
-
     serializer_class = CardSerializer
     permission_classes = [IsAuthenticated]
 
@@ -22,10 +17,6 @@ class CardListCreateView(generics.ListCreateAPIView):
 
 
 class CardDeleteView(generics.DestroyAPIView):
-    """
-    Delete a card belonging to the logged-in user.
-    """
-
     serializer_class = CardSerializer
     permission_classes = [IsAuthenticated]
 

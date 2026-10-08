@@ -1,10 +1,48 @@
 from datetime import datetime
+from decimal import Decimal
 
 from sqlalchemy import DateTime, Enum, Integer, Numeric, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from database import Base
 
+
+# ============================================================
+# USER MODEL
+# ============================================================
+
+class User(Base):
+    """
+    Read-only representation of the Django authentication_user table.
+
+    FastAPI uses this model only to retrieve:
+    - username
+    - email
+
+    Passwords and other authentication fields are not used here.
+    """
+
+    __tablename__ = "authentication_user"
+
+    id: Mapped[int] = mapped_column(
+        Integer,
+        primary_key=True,
+    )
+
+    username: Mapped[str] = mapped_column(
+        String(150),
+        nullable=False,
+    )
+
+    email: Mapped[str] = mapped_column(
+        String(255),
+        nullable=False,
+    )
+
+
+# ============================================================
+# PAYMENT MODEL
+# ============================================================
 
 class Payment(Base):
     __tablename__ = "payments"
@@ -27,7 +65,7 @@ class Payment(Base):
         index=True,
     )
 
-    amount: Mapped[float] = mapped_column(
+    amount: Mapped[Decimal] = mapped_column(
         Numeric(12, 2),
         nullable=False,
     )
@@ -64,15 +102,21 @@ class Payment(Base):
     )
 
 
+# ============================================================
+# CARD MODEL
+# ============================================================
+
 class Card(Base):
     """
     Read-only representation of the Django Card table.
 
-    FastAPI uses this model only to validate:
+    FastAPI uses this model to validate:
     - card existence
     - card ownership
+    - card status
+    - credit limit
 
-    Full card number and CVV are not stored here.
+    Full card number and CVV are NOT stored.
     """
 
     __tablename__ = "cards_card"
@@ -111,6 +155,26 @@ class Card(Base):
     expiry_year: Mapped[int] = mapped_column(
         Integer,
         nullable=False,
+    )
+
+    # --------------------------------------------------------
+    # Card status
+    # --------------------------------------------------------
+
+    status: Mapped[str] = mapped_column(
+        String(10),
+        nullable=False,
+        default="ACTIVE",
+    )
+
+    # --------------------------------------------------------
+    # Credit limit
+    # --------------------------------------------------------
+
+    credit_limit: Mapped[Decimal] = mapped_column(
+        Numeric(12, 2),
+        nullable=False,
+        default=Decimal("0.00"),
     )
 
     created_at: Mapped[datetime] = mapped_column(
